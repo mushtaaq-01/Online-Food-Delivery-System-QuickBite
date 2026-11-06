@@ -1,2 +1,8 @@
 config.bat
 node_modules
+.env
+*.env
+dist
+uploads/*.png
+uploads/*.jpg
+uploads/*.jpeg

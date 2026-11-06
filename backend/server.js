@@ -1,17 +1,23 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import fs from "fs";
 import { connectDB } from "./config/db.js";
 import foodRouter from "./routes/foodRoute.js";
 import userRouter from "./routes/userRoute.js";
-import "dotenv/config";
 import cartRouter from "./routes/cartRoute.js";
 import orderRouter from "./routes/orderRoute.js";
 
 // app config
 const app = express();
-const port =process.env.PORT || 4000;
+const port = process.env.PORT || 4000;
 
-//middlewares
+// ensure uploads directory exists
+if (!fs.existsSync("uploads")) {
+  fs.mkdirSync("uploads");
+}
+
+// middlewares
 app.use(express.json());
 app.use(cors());
 

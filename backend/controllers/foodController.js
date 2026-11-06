@@ -5,6 +5,9 @@ import fs from "fs";
 // add food items
 
 const addFood = async (req, res) => {
+  if (!req.file) {
+    return res.json({ success: false, message: "Please upload an image" });
+  }
   let image_filename = `${req.file.filename}`;
   const food = new foodModel({
     name: req.body.name,
@@ -19,9 +22,11 @@ const addFood = async (req, res) => {
       await food.save();
       res.json({ success: true, message: "Food Added" });
     } else {
+      fs.unlink(`uploads/${image_filename}`, () => {});
       res.json({ success: false, message: "You are not admin" });
     }
   } catch (error) {
+    fs.unlink(`uploads/${image_filename}`, () => {});
     console.log(error);
     res.json({ success: false, message: "Error" });
   }

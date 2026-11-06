@@ -3,13 +3,23 @@ import "./PlaceOrder.css";
 import { StoreContext } from "../../context/StoreContext";
 import axios from "axios";
 import { toast } from "react-toastify";
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from "react-router-dom";
 
 const PlaceOrder = () => {
-  const navigate= useNavigate();
+  const navigate = useNavigate();
 
-  const { getTotalCartAmount, token, food_list, cartItems, url } =
-    useContext(StoreContext);
+  const {
+    getTotalCartAmount,
+    token,
+    food_list,
+    cartItems,
+    setCartItems,
+    url,
+  } = useContext(StoreContext);
+
+  const [confirmedOrder, setConfirmedOrder] = useState(null);
+  const [loading, setLoading] = useState(false);
+
   const [data, setData] = useState({
     firstName: "",
     lastName: "",
@@ -31,38 +41,126 @@ const PlaceOrder = () => {
   const placeOrder = async (event) => {
     event.preventDefault();
     let orderItems = [];
-    food_list.map((item) => {
+    food_list.forEach((item) => {
       if (cartItems[item._id] > 0) {
-        let itemInfo = item;
-        itemInfo["quantity"] = cartItems[item._id];
+        let itemInfo = { ...item, quantity: cartItems[item._id] };
         orderItems.push(itemInfo);
       }
     });
+
     let orderData = {
       address: data,
       items: orderItems,
       amount: getTotalCartAmount() + 2,
     };
-    
-    let response= await axios.post(url+"/api/order/place",orderData,{headers:{token}});
-    if(response.data.success){
-      const {session_url}=response.data;
-      window.location.replace(session_url);
-    }else{
-      toast.error("Errors!")
+
+    setLoading(true);
+    try {
+      const response = await axios.post(
+        url + "/api/order/place",
+        orderData,
+        { headers: { token } }
+      );
+      setLoading(false);
+
+      if (response.data.success) {
+        setCartItems({});
+        setConfirmedOrder(
+          response.data.order || {
+            _id: "ORD" + Date.now().toString().slice(-6),
+            address: data,
+            items: orderItems,
+            amount: orderData.amount,
+          }
+        );
+        toast.success("Order Placed Successfully!");
+      } else {
+        toast.error(response.data.message || "Failed to place order");
+      }
+    } catch (error) {
+      setLoading(false);
+      console.error(error);
+      toast.error("An error occurred while placing the order.");
     }
   };
 
-  useEffect(()=>{
-    if(!token){
-      toast.error("Please Login first")
-      navigate("/cart")
+  useEffect(() => {
+    if (!token) {
+      toast.error("Please Login first");
+      navigate("/cart");
+    } else if (getTotalCartAmount() === 0 && !confirmedOrder) {
+      navigate("/cart");
     }
-    else if(getTotalCartAmount()===0){
-      toast.error("Please Add Items to Cart");
-      navigate("/cart")
-    }
-  },[token])
+  }, [token, confirmedOrder]);
+
+  // If order is confirmed, display Order Confirmed Summary
+  if (confirmedOrder) {
+    return (
+      <div className="order-confirmed-container">
+        <div className="order-confirmed-card">
+          <div className="order-confirmed-badge">
+            <span className="checkmark">&#10003;</span>
+          </div>
+          <h2>Order Confirmed!</h2>
+          <p className="order-confirmed-subtitle">
+            Thank you for ordering with QuickBite! Your food is now being prepared.
+          </p>
+
+          <div className="order-id-box">
+            <span>Order ID:</span>
+            <b>#{confirmedOrder._id}</b>
+          </div>
+
+          <div className="order-summary-grid">
+            <div className="summary-section">
+              <h3>Delivery Address</h3>
+              <p><b>{confirmedOrder.address?.firstName} {confirmedOrder.address?.lastName}</b></p>
+              <p>{confirmedOrder.address?.street}</p>
+              <p>{confirmedOrder.address?.city}, {confirmedOrder.address?.state} {confirmedOrder.address?.zipcode}</p>
+              <p>{confirmedOrder.address?.country}</p>
+              <p>Phone: {confirmedOrder.address?.phone}</p>
+            </div>
+
+            <div className="summary-section">
+              <h3>Order Items</h3>
+              <div className="summary-items-list">
+                {confirmedOrder.items?.map((item, index) => (
+                  <div key={index} className="summary-item-row">
+                    <span>{item.name} &times; {item.quantity}</span>
+                    <b>${item.price * item.quantity}</b>
+                  </div>
+                ))}
+                <div className="summary-item-row fee-row">
+                  <span>Delivery Charges</span>
+                  <span>$2</span>
+                </div>
+              </div>
+              <div className="summary-total-row">
+                <b>Total Paid</b>
+                <b>${confirmedOrder.amount}</b>
+              </div>
+            </div>
+          </div>
+
+          <div className="order-confirmed-actions">
+            <button
+              className="action-btn track-btn"
+              onClick={() => navigate("/myorders")}
+            >
+              Track Order
+            </button>
+            <button
+              className="action-btn home-btn"
+              onClick={() => navigate("/")}
+            >
+              Order More Food
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form className="place-order" onSubmit={placeOrder}>
       <div className="place-order-left">
@@ -90,7 +188,7 @@ const PlaceOrder = () => {
           name="email"
           value={data.email}
           onChange={onChangeHandler}
-          type="text"
+          type="email"
           placeholder="Email Address"
         />
         <input
@@ -142,7 +240,7 @@ const PlaceOrder = () => {
           name="phone"
           value={data.phone}
           onChange={onChangeHandler}
-          type="text"
+          type="tel"
           placeholder="Phone"
         />
       </div>
@@ -167,7 +265,9 @@ const PlaceOrder = () => {
               </b>
             </div>
           </div>
-          <button type="submit">PROCEED TO PAYMENT</button>
+          <button type="submit" disabled={loading}>
+            {loading ? "Placing Order..." : "PROCEED TO CHECKOUT"}
+          </button>
         </div>
       </div>
     </form>
